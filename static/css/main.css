@@ -1,0 +1,55 @@
+body, html {
+    margin: 0;
+    font-family: monospace;
+    background:gray;
+}
+
+h1, h4 {
+  text-align: center;
+}
+
+h7 {
+  font-size: 20px;
+}
+
+a {
+  color: lightgreen;
+}
+
+.content {
+    margin: 0 auto;
+    width: 600px;
+}
+
+table, td, th {
+    border: 2px solid #aaa;
+}
+
+table {
+    align-self: center;
+    border-collapse: collapse;
+    table-layout: fixed ;
+    width: 50%;
+    margin-left:auto;
+    margin-right:auto;
+}
+
+th {
+    height: 40px;
+}
+
+td {
+    text-align: center;
+    padding: 1px;
+    width: 20% ;
+    /* height: 40px; */
+}
+
+#content {
+    width: 70%;
+}
+
+input {
+    width: 70%;
+    background:gray;
+}
