@@ -85,6 +85,9 @@ def index():
         except (ValueError, TypeError):
             return 'One of values was not an integer'
 
+        if rows not in range(3,100) or cols not in range(3,100):
+            return 'Rows or columns size out of 3-100 bounds'
+
         if goal > rows and goal > cols:
             return 'Goal too high'
 
