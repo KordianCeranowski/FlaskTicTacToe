@@ -38,7 +38,7 @@
 
     socket.on('player_connected', function(msg){
       $('#players').empty()
-      $('#players').append(`${msg['joined_players_emojis']}`)
+      $('#players').append(`Joined Players: ${msg['joined_players_emojis']}`)
     })
 
     $('.cell').click(function() {

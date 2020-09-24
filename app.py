@@ -17,10 +17,11 @@ def player_connected(msg, methods=['GET', 'POST']):
     game = Game.query.get_or_404(msg['game_id'])
     if msg['player_id'] not in game.get_players_register():
         game.set_players_register(msg['player_id'], msg['emoji'])
-        socketio.emit('player_connected', {
-            'game_id': msg['game_id'],
-            'joined_players_emojis': ' '.join(game.get_players_register().values())
-        })
+    print(game.get_players_register())
+    socketio.emit('player_connected', {
+        'game_id': msg['game_id'],
+        'joined_players_emojis': ' '.join(game.get_players_register().values())
+    })
 
 @socketio.on('pressed_cell')
 def pressed_cell(msg, methods=['GET', 'POST']):
