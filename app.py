@@ -14,7 +14,13 @@ socketio = SocketIO(app)
 
 @socketio.on('player_connected')
 def player_connected(msg, methods=['GET', 'POST']):
-    print(msg)
+    game = Game.query.get_or_404(msg['game_id'])
+    if msg['player_id'] not in game.get_players_register():
+        game.set_players_register(msg['player_id'], msg['emoji'])
+        socketio.emit('player_connected', {
+            'game_id': msg['game_id'],
+            'joined_players_emojis': ' '.join(game.get_players_register().values())
+        })
 
 @socketio.on('pressed_cell')
 def pressed_cell(msg, methods=['GET', 'POST']):
@@ -50,7 +56,7 @@ def create_game(msg, methods=['GET', 'POST']):
         rows = int(msg['rows'])
         cols = int(msg['cols'])
         goal = int(msg['goal'])
-        players = int(msg['players'])
+        players_count = int(msg['players_count'])
     except (ValueError, TypeError):
         errors = ['One of values was not an integer']
     if rows not in range(3,100) or cols not in range(3,100):
@@ -59,13 +65,13 @@ def create_game(msg, methods=['GET', 'POST']):
         errors += ['Goal too high']
     if goal < 3:
         errors += ['Goal too low']
-    if players > len(Game.player_signs):
-        errors += ['Too many players']
-    if players < 2:
-        errors += ['Not enough players']
+    if players_count > len(Game.player_signs):
+        errors += ['Too many players_count']
+    if players_count < 2:
+        errors += ['Not enough players_count']
 
     if not errors:
-        new_game = Game(rows, cols, goal, players)
+        new_game = Game(rows, cols, goal, players_count)
         try:
             db.session.add(new_game)
             db.session.commit()
@@ -80,7 +86,7 @@ def create_game(msg, methods=['GET', 'POST']):
             'rows': rows,
             'cols': cols,
             'goal': goal,
-            'players': players
+            'players_count': players_count
         })
     else:
         socketio.emit('game_create_failure', {
@@ -126,7 +132,8 @@ class Game(db.Model):
     cols = db.Column(db.Integer)
     date_created = db.Column(db.DateTime, default=datetime.utcnow)
     board = db.Column(db.PickleType)
-    players = db.Column(db.Integer)
+    players_register = db.Column(db.PickleType)
+    players_count = db.Column(db.Integer)
     round = db.Column(db.Integer)
     winner = db.Column(db.String(4), default=' ')
     goal =  db.Column(db.Integer)
@@ -134,14 +141,15 @@ class Game(db.Model):
     def default_value():
         return '_'
 
-    def __init__(self, rows, cols, goal, players):
+    def __init__(self, rows, cols, goal, players_count):
         self.rows = rows
         self.cols = cols
         self.goal = goal
-        self.players = players
+        self.players_count = players_count
         self.round = 0
         board = defaultdict(Game.default_value)
         self.board = pickle.dumps(board)
+        self.players_register = pickle.dumps({})
 
     def set_board(self, row, col, val):
         self.board = pickle.loads(self.board)
@@ -150,6 +158,15 @@ class Game(db.Model):
 
     def get_board(self):
         return pickle.loads(self.board)
+
+    def set_players_register(self, id, emoji):
+        players_register = pickle.loads(self.players_register)
+        players_register[id] = emoji
+        self.players_register = pickle.dumps(players_register)
+        db.session.commit()
+
+    def get_players_register(self):
+        return pickle.loads(self.players_register)
 
     def __repr__(self):
         return f'Game: id={self.id}, date={self.date_created}, board={self.get_board()},'
@@ -179,10 +196,10 @@ class Game(db.Model):
     player_signs = ['👣', '🐒', '😂', '🤔', '💋']
 
     def current_player_sign(self):
-        return Game.player_signs[self.round % self.players]
+        return Game.player_signs[self.round % self.players_count]
 
     def current_player_id(self):
-        return self.round % self.players
+        return self.round % self.players_count
 
 if __name__ == '__main__':
     app.run(debug=True)

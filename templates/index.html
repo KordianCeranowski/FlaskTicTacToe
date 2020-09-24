@@ -5,21 +5,17 @@
 {% block body %}
 
 <script type="text/javascript">
-  var socket = io.connect(`http://${document.domain}:${location.port}`);
-
   $(document).ready(() => {
+    var socket = io.connect(`http://${document.domain}:${location.port}`);
+
     $('#button-create').click(function() {
       console.log(Cookies.get('kuki'));
       socket.emit('created_game', {
         'rows':     $("#rows").val(),
         'cols':     $("#cols").val(),
         'goal':     $("#goal").val(),
-        'players':  $("#players").val()
+        'players_count':  $("#players_count").val()
       })
-    })
-
-    $('#button-set-emoji').click(function() {
-      Cookies.set('emoji', $("#emoji").val())
     })
 
     socket.on('game_create_success', function(msg) {
@@ -27,7 +23,7 @@
         `<tr id='table_row_${msg['id']}'>
           <td>${msg['rows']} x ${msg['cols']}</td>
           <td>${msg['goal']}</td>
-          <td>${msg['players']}</td>
+          <td>${msg['players_count']}</td>
           <td>0</td>
           <td>
             <a href="/game/${msg['id']}" class="btn btn-success">
@@ -58,6 +54,9 @@
     if(Cookies.get('session_id') == undefined)
       Cookies.set('session_id', `${parseInt(Math.random()*100000000)}`)
 
+    $('#button-set-emoji').click(function() {
+      Cookies.set('emoji', $("#emoji").val())
+    })
 
   })
 </script>
@@ -79,7 +78,7 @@
       <tr id='table_row_{{ game.id }}'>
         <td>{{ game.rows }} x {{ game.cols }}</td>
         <td>{{ game.goal }}</td>
-        <td>{{ game.players }}</td>
+        <td>{{ game.players_count }}</td>
         <td>{{ game.round }}</td>
         <td>
           <a href="/game/{{ game.id }}" class="btn btn-success">
@@ -104,7 +103,7 @@
         <input type="text" class="form-control mb-2" id="goal" placeholder="Goal">
       </div>
       <div class="col-auto">
-        <input type="text" class="form-control mb-2" id="players" placeholder="Players">
+        <input type="text" class="form-control mb-2" id="players_count" placeholder="Players">
       </div>
       <div class="col-auto">
         <input type='submit' id="button-create" class="btn btn-primary mb-2"></input>

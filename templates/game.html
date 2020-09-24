@@ -10,11 +10,35 @@
 
   $(document).ready(() => {
 
+  function emojiUnicode (emoji) {
+    var comp;
+    if (emoji.length === 1) {
+      comp = emoji.charCodeAt(0);
+    }
+    comp = ((emoji.charCodeAt(0) - 0xD800) * 0x400
+          + (emoji.charCodeAt(1) - 0xDC00) + 0x10000
+    );
+    if (comp < 0) {
+      comp = emoji.charCodeAt(0);
+    }
+    return `&#x${comp.toString("16")};`
+  };
+
+    socket.on('echo', function(msg){
+      console.log(msg['text'])
+    })
+
     socket.on('connect', function(msg){
       socket.emit('player_connected', {
         'player_id': Cookies.get('session_id'),
+        'emoji': emojiUnicode(Cookies.get('emoji')),
         'game_id': {{ game.id }}
       })
+    })
+
+    socket.on('player_connected', function(msg){
+      $('#players').empty()
+      $('#players').append(`${msg['joined_players_emojis']}`)
     })
 
     $('.cell').click(function() {
@@ -38,7 +62,6 @@
 
         $('#curr_round').empty()
         $('#curr_round').append(`Round: ${msg['round']}`)
-
       }
     })
   })
@@ -52,7 +75,10 @@
     <td id='curr_round'>Round {{game.round}}</td>
   </tr>
   <tr>
-    <td id='curr_player'>Current player: {{ game.current_player_sign() }}</td>
+    <td id='curr_player'>Current Player: {{ game.current_player_sign() }}</td>
+  </tr>
+  <tr>
+    <td id='players'>Joined Players:</td>
   </tr>
 </table>
 
@@ -61,7 +87,7 @@
   <tr>
     {% for col in range(game.cols) %}
     {% if game.get_board()[(row,col)] != '_' %}
-      <td class='cell cell_css' row={{row}} col={{col}}>{{ game.get_board()[(row,col)] }}</td>
+      <td class='cell_css'>{{ game.get_board()[(row,col)] }}</td>
     {% else %}
       <td class='cell cell_css' row={{row}} col={{col}}></td>
     {% endif %}
