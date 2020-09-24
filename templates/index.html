@@ -1,66 +1,125 @@
 {% extends 'base.html' %}
 
 {% block head %}
-<title>PicPacPoe</title>
 {% endblock %}
-
 {% block body %}
-<div class="content">
-  <h1>PicPacPoe</h1>
 
-  {% if games|length < 1 %}
-  <h4>Nothin'<h4>
-  {% else %}
+<script type="text/javascript">
+  var socket = io.connect(`http://${document.domain}:${location.port}`);
 
-  <table>
-    <tr>
-      <th>Game Size</th>
-      <td>Goal</td>
-      <th>Players</th>
-      <th>Round</th>
-      <th>Actions</th>
-    </tr>
+  $(document).ready(() => {
+    $('#button-create').click(function() {
+      console.log(Cookies.get('kuki'));
+      socket.emit('created_game', {
+        'rows':     $("#rows").val(),
+        'cols':     $("#cols").val(),
+        'goal':     $("#goal").val(),
+        'players':  $("#players").val()
+      })
+    })
 
-    {% for game in games %}
-    <tr>
-      <td>{{ game.rows }}x{{ game.cols }}</td>
-      <td>{{ game.goal }}</td>
-      <td>{{ game.players }}</td>
-      <td>{{ game.round }}</td>
-      <td>
-        {% if game.winner == ' ' %}
-          <a href="/game/{{ game.id }}">JOIN</a>
-        {% else %}
-          <a href="/game/{{ game.id }}">RESULT</a>
-          <br>
-          <a href="/delete/{{ game.id }}">Delete</a>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
+    $('#button-set-emoji').click(function() {
+      Cookies.set('emoji', $("#emoji").val())
+    })
 
-  </table>
+    socket.on('game_create_success', function(msg) {
+      $('.table').append(
+        `<tr id='table_row_${msg['id']}'>
+          <td>${msg['rows']} x ${msg['cols']}</td>
+          <td>${msg['goal']}</td>
+          <td>${msg['players']}</td>
+          <td>0</td>
+          <td>
+            <a href="/game/${msg['id']}" class="btn btn-success">
+              Join
+            </a>
+            <a game-id=${msg['id']} class="btn btn-danger button-remove">
+              Remove
+            </a>
+          </td>
+        </tr>`)
+        $('.button-remove').click(function() {
+          socket.emit('deleted_game', {
+            'id':  $(this).attr('game-id')
+          })
+        })
+    })
 
-  {% endif %}
+    $('.button-remove').click(function() {
+      socket.emit('deleted_game', {
+        'id':  $(this).attr('game-id')
+      })
+    })
 
-  <br>
-  <form action="/" method="POST">
-    <table class="new-game-input">
+    socket.on('game_delete_success', function(msg) {
+      $(`#table_row_${msg['id']}`).remove()
+    })
+
+    if(Cookies.get('session_id') == undefined)
+      Cookies.set('session_id', `${parseInt(Math.random()*100000000)}`)
+
+
+  })
+</script>
+
+<div class="container">
+  <div class="jumbotron">
+    <div class="page-header">
+      <h1>PicPacPoe &#x1F923;</h1>
+    </div>
+    <table class="table table-striped">
       <tr>
-        <td>Rows</td>
-        <td>Columns</td>
-        <td>Goal</td>
-        <td>Players</td>
+        <th scope="col">Size</th>
+        <th scope="col">Goal</th>
+        <th scope="col">Players</th>
+        <th scope="col">Round</th>
+        <th scope="col">Options</th>
       </tr>
-      <tr>
-        <td><input type="text" name="rows" id="rows"></td>
-        <td><input type="text" name="cols" id="cols"></td>
-        <td><input type="text" name="goal" id="goal"></td>
-        <td><input type="text" name="players" id="players"></td>
-        <td><input type="submit" value="Add"></td>
+      {% for game in games %}
+      <tr id='table_row_{{ game.id }}'>
+        <td>{{ game.rows }} x {{ game.cols }}</td>
+        <td>{{ game.goal }}</td>
+        <td>{{ game.players }}</td>
+        <td>{{ game.round }}</td>
+        <td>
+          <a href="/game/{{ game.id }}" class="btn btn-success">
+            Join
+          </a>
+          <a game-id={{ game.id }} class="btn btn-danger button-remove">
+            Remove
+          </a>
+        </td>
       </tr>
+      {% endfor %}
     </table>
 
-  </form>
+    <div class="form-row align-items-center">
+      <div class="col-auto">
+        <input type="text" class="form-control mb-2" id="rows" placeholder="Rows">
+      </div>
+      <div class="col-auto">
+        <input type="text" class="form-control mb-2" id="cols" placeholder="Columns">
+      </div>
+      <div class="col-auto">
+        <input type="text" class="form-control mb-2" id="goal" placeholder="Goal">
+      </div>
+      <div class="col-auto">
+        <input type="text" class="form-control mb-2" id="players" placeholder="Players">
+      </div>
+      <div class="col-auto">
+        <input type='submit' id="button-create" class="btn btn-primary mb-2"></input>
+      </div>
+    </div>
+
+    <div class="form-row align-items-center">
+      <div class="col-auto">
+        <input type="text" class="form-control mb-2" id="emoji" placeholder="Set your custom emoji">
+      </div>
+      <div class="col-auto">
+        <input type='submit' id="button-set-emoji" class="btn btn-primary mb-2"></input>
+      </div>
+    </div>
+
+  </div>
 </div>
 {% endblock %}

@@ -1,12 +1,124 @@
-from flask import Flask, render_template, url_for, request, redirect
+from flask import Flask, render_template, url_for, request, redirect, make_response
 from flask_sqlalchemy import SQLAlchemy
+from flask_socketio import SocketIO
 from datetime import datetime
 import pickle
 from collections import defaultdict
 
+# json.dumps(obj.__dict__)
+
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 db = SQLAlchemy(app)
+socketio = SocketIO(app)
+
+@socketio.on('player_connected')
+def player_connected(msg, methods=['GET', 'POST']):
+    print(msg)
+
+@socketio.on('pressed_cell')
+def pressed_cell(msg, methods=['GET', 'POST']):
+    id = int(msg['game_id'])
+    row = int(msg['row'])
+    col = int(msg['col'])
+    game = Game.query.get_or_404(id)
+    sign = game.current_player_sign()
+
+    game.set_board(row, col, game.current_player_sign())
+    if game.has_won(row, col, game.goal, sign):
+        game.winner = sign
+    if game.is_draw():
+        game.winner = 'DRAW'
+    game.round += 1
+    try:
+        db.session.commit()
+    except:
+        print('Error while saving gamestate')
+    socketio.emit('pressed_cell', {
+        'game_id': id,
+        'row': row,
+        'col': col,
+        'sign': sign,
+        'next_sign': game.current_player_sign(),
+        'round': game.round
+    })
+
+@socketio.on('created_game')
+def create_game(msg, methods=['GET', 'POST']):
+    try:
+        errors = []
+        rows = int(msg['rows'])
+        cols = int(msg['cols'])
+        goal = int(msg['goal'])
+        players = int(msg['players'])
+    except (ValueError, TypeError):
+        errors = ['One of values was not an integer']
+    if rows not in range(3,100) or cols not in range(3,100):
+        errors += ['Rows or columns size out of 3-100 bounds']
+    if goal > rows and goal > cols:
+        errors += ['Goal too high']
+    if goal < 3:
+        errors += ['Goal too low']
+    if players > len(Game.player_signs):
+        errors += ['Too many players']
+    if players < 2:
+        errors += ['Not enough players']
+
+    if not errors:
+        new_game = Game(rows, cols, goal, players)
+        try:
+            db.session.add(new_game)
+            db.session.commit()
+            id = Game.query.order_by(Game.date_created.desc()).first().id
+        except:
+            errors += ['Error while saving to database']
+
+    print(errors)
+    if not errors:
+        socketio.emit('game_create_success', {
+            'id': id,
+            'rows': rows,
+            'cols': cols,
+            'goal': goal,
+            'players': players
+        })
+    else:
+        socketio.emit('game_create_failure', {
+            'errors': errors
+        })
+
+@socketio.on('deleted_game')
+def delete_game(msg, methods=['GET', 'POST']):
+    errors = []
+    game_to_delete = Game.query.get_or_404(msg['id'])
+    try:
+        db.session.delete(game_to_delete)
+        db.session.commit()
+    except:
+        errors += ['Error while saving to database']
+
+    if not errors:
+        socketio.emit('game_delete_success', {
+            'id': msg['id']
+        })
+    else:
+        socketio.emit('game_delete_failure', {
+            'errors': errors
+        })
+
+@app.route('/')
+def index():
+    games = Game.query.order_by(Game.date_created).all()
+    # śmieszny easter egg
+    resp = make_response(render_template('index.html', games=games))
+    resp.set_cookie('ciastko', 'jebac pis')
+    return resp
+
+@app.route('/game/<int:id>')
+def run_game(id):
+    game_to_play = Game.query.get_or_404(id)
+    return render_template('game.html', game=game_to_play)
+
 
 class Game(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -42,7 +154,6 @@ class Game(db.Model):
     def __repr__(self):
         return f'Game: id={self.id}, date={self.date_created}, board={self.get_board()},'
 
-
     def get_pattern(self, row, col, size, func):
         board = self.get_board()
         arr = [board[func(row, col, diff)] for diff in range(-size + 1, size)]
@@ -65,7 +176,7 @@ class Game(db.Model):
     def is_draw(self):
         return len(self.get_board().keys()) == self.rows * self.cols
 
-    player_signs = ['😂', '🐒', '👣', '🤔', '💋']
+    player_signs = ['👣', '🐒', '😂', '🤔', '💋']
 
     def current_player_sign(self):
         return Game.player_signs[self.round % self.players]
@@ -73,85 +184,5 @@ class Game(db.Model):
     def current_player_id(self):
         return self.round % self.players
 
-
-@app.route('/', methods=['POST', 'GET'])
-def index():
-    if request.method =='POST':
-        try:
-            rows = int(request.form['rows'])
-            cols = int(request.form['cols'])
-            goal = int(request.form['goal'])
-            players = int(request.form['players'])
-        except (ValueError, TypeError):
-            return 'One of values was not an integer'
-
-        if rows not in range(3,100) or cols not in range(3,100):
-            return 'Rows or columns size out of 3-100 bounds'
-
-        if goal > rows and goal > cols:
-            return 'Goal too high'
-
-        if goal < 3:
-            return 'Goal too low'
-
-        if players > len(Game.player_signs):
-            return 'Too many players'
-
-        if players < 2:
-            return 'Not enough players'
-
-        new_game = Game(rows, cols, goal, players)
-
-        try:
-            db.session.add(new_game)
-            db.session.commit()
-            return redirect('/')
-        except:
-            return 'Error while loading menu'
-    else:
-        games = Game.query.order_by(Game.date_created).all()
-        return render_template('index.html', games=games)
-
-
-@app.route('/delete/<int:id>')
-def delete(id):
-    game_to_delete = Game.query.get_or_404(id)
-    try:
-        db.session.delete(game_to_delete)
-        db.session.commit()
-        return redirect('/')
-    except:
-        return 'Error while deleting game'
-
-
-@app.route('/game/<int:id>', methods=['GET', 'POST'])
-def run_game(id):
-    game_to_play = Game.query.get_or_404(id)
-    if request.method == 'POST':
-        pass
-    else:
-        return render_template('game.html', game=game_to_play)
-
-
-@app.route('/game/<int:id>/row/<int:row>/col/<int:col>', methods=['GET', 'POST'])
-def press(id, row, col):
-    game = Game.query.get_or_404(id)
-    game.set_board(row, col, game.current_player_sign())
-
-    if game.has_won(row, col, game.goal, game.current_player_sign()):
-        game.winner = game.current_player_sign()
-
-    if game.is_draw():
-        game.winner = 'DRAW'
-
-    game.round += 1
-
-    try:
-        db.session.commit()
-    except:
-        return 'Error while sign'
-    # return run_game(id)
-    return redirect(f'/game/{id}')
-
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(debug=True)
