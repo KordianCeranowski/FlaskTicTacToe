@@ -15,7 +15,8 @@ socketio = SocketIO(app)
 @socketio.on('player_connected')
 def player_connected(msg, methods=['GET', 'POST']):
     game = Game.query.get_or_404(msg['game_id'])
-    if msg['player_id'] not in game.get_players_register():
+    if  len(game.get_players_register()) < game.players_count and \
+        msg['player_id'] not in game.get_players_register():
         game.set_players_register(msg['player_id'], msg['emoji'])
     print(game.get_players_register())
     socketio.emit('player_connected', {
@@ -66,8 +67,6 @@ def create_game(msg, methods=['GET', 'POST']):
         errors += ['Goal too high']
     if goal < 3:
         errors += ['Goal too low']
-    if players_count > len(Game.player_signs):
-        errors += ['Too many players_count']
     if players_count < 2:
         errors += ['Not enough players_count']
 
@@ -194,13 +193,20 @@ class Game(db.Model):
     def is_draw(self):
         return len(self.get_board().keys()) == self.rows * self.cols
 
-    player_signs = ['👣', '🐒', '😂', '🤔', '💋']
-
     def current_player_sign(self):
-        return Game.player_signs[self.round % self.players_count]
+        if (len(self.get_players_register()) < self.players_count):
+            return "Waiting"
+        return list(self.get_players_register().values())[self.current_player_id()]
 
     def current_player_id(self):
         return self.round % self.players_count
+
+    def get_state(self):
+        if len(self.get_players_register()) < self.players_count:
+            return f"Waiting for players: {len(self.get_players_register())}/{self.players_count}"
+        if self.winner != '_':
+            return f"In progress. Round: {self.round}"
+        return f"Game ended. Winner: {self.winner}"
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -64,7 +64,7 @@
 <div class="container">
   <div class="jumbotron">
     <div class="page-header">
-      <h1>PicPacPoe &#x1F923;</h1>
+      <h1>PicPacPoe 🐍 &#x1F923;</h1>
     </div>
     <table class="table table-striped">
       <tr>
@@ -79,7 +79,7 @@
         <td>{{ game.rows }} x {{ game.cols }}</td>
         <td>{{ game.goal }}</td>
         <td>{{ game.players_count }}</td>
-        <td>{{ game.round }}</td>
+        <td>{{ game.get_state() }}</td>
         <td>
           <a href="/game/{{ game.id }}" class="btn btn-success">
             Join
