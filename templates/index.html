@@ -9,27 +9,10 @@ $(document).ready(() => {
 
 var socket = io.connect(`http://${document.domain}:${location.port}`);
 
-socket.on('console.log', function(msg)
-{
-  console.log(msg)
-  console.log(msg['text'])
-})
-
 socket.on('connect', function(msg)
 {
   socket.emit('player_joined_menu', {})
-  console.log('sent')
-})
-
-$('#button-create').click(function()
-{
-  socket.emit('created_game',
-  {
-    'rows':     $("#rows").val(),
-    'cols':     $("#cols").val(),
-    'goal':     $("#goal").val(),
-    'players_count':  $("#players_count").val()
-  })
+  console.log('sent player_joined_menu')
 })
 
 function update_menu(games)
@@ -51,59 +34,34 @@ function update_menu(games)
   })
   $('.button-remove').click(function()
   {
-    socket.emit('deleted_game', {
+    console.log(`clicked button-remove`)
+    socket.emit('deleted_game',
+    {
       'id':  $(this).attr('game-id')
     })
-  });
+    console.log(`sent deleted_game with id:${$(this).attr('game-id')}`);
+  })
 }
 
 socket.on('update_menu', function(msg)
 {
-  console.log(msg['games'])
+  console.log(`recived update_menu`)
   var games = JSON.parse(msg)['games'];
-  console.log(games)
+  console.log(`recived update_menu with ${games}`)
   update_menu(games)
 })
 
-socket.on('game_create_success', function(msg)
+$('#button-create').click(function()
 {
-  $('.table').append(
-    `<tr id='table_row_${msg['id']}'>
-      <td>${msg['rows']} x ${msg['cols']}</td>
-      <td>${msg['goal']}</td>
-      <td>${msg['players_count']}</td>
-      <td>0</td>
-      <td>
-        <a href="/game/${msg['id']}" class="btn btn-success">
-          Join
-        </a>
-        <a game-id=${msg['id']} class="btn btn-danger button-remove">
-          Remove
-        </a>
-      </td>
-    </tr>`)
-    $('.button-remove').click(function() {
-      socket.emit('deleted_game', {
-        'id':  $(this).attr('game-id')
-      })
-    })
-})
-
-$('.button-remove').click(function()
-{
-  socket.emit('deleted_game',
+  console.log('clicked button-create')
+  socket.emit('created_game',
   {
-    'id':  $(this).attr('game-id')
+    'rows':     $("#rows").val(),
+    'cols':     $("#cols").val(),
+    'goal':     $("#goal").val(),
+    'players_count':  $("#players_count").val()
   })
 })
-
-socket.on('game_delete_success', function(msg)
-{
-  $(`#table_row_${msg['id']}`).remove()
-})
-
-if(Cookies.get('session_id') == undefined)
-  Cookies.set('session_id', `${parseInt(Math.random()*100000000)}`)
 
 $('#button-set-emoji').click(function()
 {
@@ -113,6 +71,8 @@ $('#button-set-emoji').click(function()
   $("#emoji").val("")
 })
 
+if(Cookies.get('session_id') == undefined)
+  Cookies.set('session_id', `${parseInt(Math.random()*100000000)}`)
 $('#your_emoji').append(Cookies.get('emoji'))
 
 })

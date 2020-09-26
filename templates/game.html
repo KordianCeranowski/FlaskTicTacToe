@@ -1,72 +1,65 @@
 {% extends 'base.html' %}
-
 {% block head %}
-
 {% endblock %}
 {% block body %}
-
 <script type="text/javascript">
-  var socket = io.connect(`http://${document.domain}:${location.port}`);
+var socket = io.connect(`http://${document.domain}:${location.port}`);
+$(document).ready(() => {
+function emojiUnicode (emoji) {
+  var comp;
+  if (emoji.length === 1) {comp = emoji.charCodeAt(0);}
+  comp = ((emoji.charCodeAt(0) - 0xD800) * 0x400
+        + (emoji.charCodeAt(1) - 0xDC00) + 0x10000);
+  if (comp < 0) {comp = emoji.charCodeAt(0);}
+  return `&#x${comp.toString("16")};`
+};
 
-  $(document).ready(() => {
-
-  function emojiUnicode (emoji) {
-    var comp;
-    if (emoji.length === 1) {
-      comp = emoji.charCodeAt(0);
-    }
-    comp = ((emoji.charCodeAt(0) - 0xD800) * 0x400
-          + (emoji.charCodeAt(1) - 0xDC00) + 0x10000
-    );
-    if (comp < 0) {
-      comp = emoji.charCodeAt(0);
-    }
-    return `&#x${comp.toString("16")};`
-  };
-
-    socket.on('connect', function(msg){
-      socket.emit('player_connected', {
-        'player_id': Cookies.get('session_id'),
-        'emoji': emojiUnicode(Cookies.get('emoji')),
-        'game_id': {{ game.id }}
-      })
-    })
-
-    socket.on('player_connected', function(msg){
-      $('#players').empty()
-      $('#players').append(`Joined Players: ${msg['joined_players_emojis']}`)
-    })
-
-    $('.cell').click(function() {
-      var row = $(this).attr('row')
-      var col = $(this).attr('col')
-      console.log(`row: ${row}, col: ${col}`)
-      socket.emit('pressed_cell', {
-        'game_id': {{ game.id }},
-        'row': `${row}`,
-        'col': `${col}`,
-        'player_id': Cookies.get('session_id')
-      })
-    })
-
-    socket.on('pressed_cell', function(msg) {
-      if(msg['game_id'] == {{ game.id }}) {
-        $(`[row=${msg['row']}][col=${msg['col']}]`)
-        .replaceWith(`<td class=\'cell_css\'>${msg['sign']}</td>`)
-
-        $('#curr_player').empty()
-        $('#curr_player').append(`Current player: ${msg['next_sign']}`)
-
-        $('#curr_round').empty()
-        $('#curr_round').append(`Round: ${msg['round']}`)
-      }
-    })
-
-    socket.on('test', function(msg) {
-      console.log('test')
-      console.log(msg)
-    })
+socket.on('connect', function(msg)
+{
+  socket.emit('player_connected',
+  {
+    'player_id': Cookies.get('session_id'),
+    'emoji': emojiUnicode(Cookies.get('emoji')),
+    'game_id': {{ game.id }}
   })
+})
+
+socket.on('player_joined_game', function(msg)
+{
+  $('#players').empty()
+  $('#players').append(`Joined Players: ${msg['joined_players_emojis']}`)
+})
+
+$('.cell').click(function()
+{
+  var row = $(this).attr('row')
+  var col = $(this).attr('col')
+  console.log(`row: ${row}, col: ${col}`)
+  socket.emit('pressed_cell',
+  {
+    'game_id': {{ game.id }},
+    'row': `${row}`,
+    'col': `${col}`,
+    'player_id': Cookies.get('session_id')
+  })
+})
+
+socket.on('pressed_cell', function(msg)
+{
+  if(msg['game_id'] == {{ game.id }})
+  {
+    $(`[row=${msg['row']}][col=${msg['col']}]`)
+    .replaceWith(`<td class=\'cell_css\'>${msg['sign']}</td>`)
+
+    $('#curr_player').empty()
+    $('#curr_player').append(`Current player: ${msg['next_sign']}`)
+
+    $('#curr_round').empty()
+    $('#curr_round').append(`Round: ${msg['round']}`)
+  }
+})
+
+})
 </script>
 
 <table id=ui class=table-striped>

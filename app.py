@@ -1,3 +1,5 @@
+# <editor-fold SETUP>
+
 from flask import Flask, render_template, url_for, request, redirect, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO
@@ -14,7 +16,78 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 db = SQLAlchemy(app)
 socketio = SocketIO(app)
 
-@socketio.on('player_connected')
+# </editor-fold>
+
+# <editor-fold MENU
+
+@app.route('/')
+def index():
+    games = Game.query.order_by(Game.date_created).all()
+    return render_template('index.html', games=games)
+
+@socketio.on('player_joined_menu')
+def player_joined_menu(msg, methods=['GET, POST']):
+    socketio.emit('update_menu', Game.all_to_json(), room=request.sid)
+
+@socketio.on('created_game')
+def create_game(msg, methods=['GET', 'POST']):
+    try:
+        errors = []
+        rows = int(msg['rows'])
+        cols = int(msg['cols'])
+        goal = int(msg['goal'])
+        players_count = int(msg['players_count'])
+    except (ValueError, TypeError):
+        errors += ['One of values was not an integer']
+    if rows not in range(3,100) or cols not in range(3,100):
+        errors += ['Rows or columns size out of 3-100 bounds']
+    if goal > rows and goal > cols:
+        errors += ['Goal too high']
+    if goal < 3:
+        errors += ['Goal too low']
+    if players_count < 1:
+        errors += ['Not enough players_count']
+    if not errors:
+        new_game = Game(rows, cols, goal, players_count)
+        try:
+            db.session.add(new_game)
+            db.session.commit()
+            id = Game.query.order_by(Game.date_created.desc()).first().id
+        except:
+            errors += ['Error while saving to database']
+    print(f'creating game, errors: {errors}')
+    if not errors:
+        print(f'sending update_menu with {Game.all_to_json()}')
+        socketio.emit('update_menu', Game.all_to_json())
+    else:
+        socketio.emit('game_create_failure', {
+            'errors': errors
+        })
+
+@socketio.on('deleted_game')
+def delete_game(msg, methods=['GET', 'POST']):
+    print(f"recived deleted_game with {msg}")
+    errors = []
+    game_to_delete = Game.query.get_or_404(msg['id'])
+    try:
+        db.session.delete(game_to_delete)
+        db.session.commit()
+    except:
+        errors += ['Error while saving to database']
+
+    print(f'removed game with id:{msg["id"]}, errors:{errors}')
+    if not errors:
+        print('sending updated_menu')
+        socketio.emit('update_menu', Game.all_to_json())
+
+# </editor-fold>
+
+# <editor-fold GAME
+@app.route('/game/<int:id>')
+def run_game(id):
+    return render_template('game.html')
+
+@socketio.on('player_joined_game')
 def player_connected(msg, methods=['GET', 'POST']):
     game = Game.query.get_or_404(msg['game_id'])
     if  len(game.get_players_register()) < game.players_count and \
@@ -26,9 +99,6 @@ def player_connected(msg, methods=['GET', 'POST']):
         'joined_players_emojis': ' '.join(game.get_players_register().values())
     })
 
-@socketio.on('player_joined_menu')
-def player_joined_menu(msg, methods=['GET, POST']):
-    socketio.emit('update_menu', Game.all_to_json(), room=request.sid)
 
 @socketio.on('pressed_cell')
 def pressed_cell(msg, methods=['GET', 'POST']):
@@ -63,63 +133,7 @@ def pressed_cell(msg, methods=['GET', 'POST']):
     socketio.emit('test', game.to_json())
     socketio.emit('test', {'text':'aaaaaaaaaaaaaa'}, room=request.sid)
 
-@socketio.on('created_game')
-def create_game(msg, methods=['GET', 'POST']):
-    try:
-        errors = []
-        rows = int(msg['rows'])
-        cols = int(msg['cols'])
-        goal = int(msg['goal'])
-        players_count = int(msg['players_count'])
-    except (ValueError, TypeError):
-        errors += ['One of values was not an integer']
-    if rows not in range(3,100) or cols not in range(3,100):
-        errors += ['Rows or columns size out of 3-100 bounds']
-    if goal > rows and goal > cols:
-        errors += ['Goal too high']
-    if goal < 3:
-        errors += ['Goal too low']
-    if players_count < 1:
-        errors += ['Not enough players_count']
-    if not errors:
-        new_game = Game(rows, cols, goal, players_count)
-        try:
-            db.session.add(new_game)
-            db.session.commit()
-            id = Game.query.order_by(Game.date_created.desc()).first().id
-        except:
-            errors += ['Error while saving to database']
-    print(errors)
-    if not errors:
-        socketio.emit('update_menu', Game.all_to_json())
-    else:
-        socketio.emit('game_create_failure', {
-            'errors': errors
-        })
-
-@socketio.on('deleted_game')
-def delete_game(msg, methods=['GET', 'POST']):
-    errors = []
-    game_to_delete = Game.query.get_or_404(msg['id'])
-    try:
-        db.session.delete(game_to_delete)
-        db.session.commit()
-    except:
-        errors += ['Error while saving to database']
-
-    if not errors:
-        socketio.emit('update_menu', Game.all_to_json())
-    else:
-        socketio.emit('game_delete_failure', {'errors': errors})
-
-@app.route('/')
-def index():
-    games = Game.query.order_by(Game.date_created).all()
-    return render_template('index.html', games=games)
-
-@app.route('/game/<int:id>')
-def run_game(id):
-    return render_template('game.html')
+# </editor-fold>
 
 
 class Game(db.Model):
@@ -145,6 +159,7 @@ class Game(db.Model):
                 "state": "{self.get_state()}", \
                 "round": {self.round}, \
                 "winner": "{str(self.winner)}", \
+                "emojis": {str(list(self.get_players_register().values()))}, \
                 "board": {str({str(key): str(self.get_board()[key]) for key in self.get_board()})} \
                 '+ '}')
         return re.sub(r"'", "\"", re.sub(r"[\s\t]*", "", json))
