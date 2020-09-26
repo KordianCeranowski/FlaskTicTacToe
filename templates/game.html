@@ -27,15 +27,23 @@ socket.on('connect', function(msg)
 
 function update_game(game)
 {
-  console.log('brrrrrrrrrrrr');
-  console.log(game)
+  var board = game.board
+  for (var key in board){
+    var parsed_key = key.substring(1, key.length-1).split(',')
+    var row = parsed_key[0]
+    var col = parsed_key[1]
+    $(`[row=${row}][col=${col}]`).empty()
+    $(`[row=${row}][col=${col}]`).append(board[key])
+  }
+  $('#round').text(`Round ${game.round}`)
 }
 
 socket.on('update_game', function(msg)
 {
   console.log(`recived update_game`)
-  var game = JSON.parse(msg)['game'];
+  var game = JSON.parse(msg);
   console.log(`recived update_game with ${game}`)
+  console.log(game)
   update_game(game)
 })
 
@@ -43,7 +51,8 @@ $('.cell').click(function()
 {
   var row = $(this).attr('row')
   var col = $(this).attr('col')
-  console.log(`row: ${row}, col: ${col}`)
+  console.log(`clicked row: ${row}, col: ${col}`)
+  console.log('emitting pressed_cell');
   socket.emit('pressed_cell',
   {
     'game_id': {{ id }},
@@ -51,21 +60,6 @@ $('.cell').click(function()
     'col': `${col}`,
     'player_id': Cookies.get('session_id')
   })
-})
-
-socket.on('pressed_cell', function(msg)
-{
-  if(msg['game_id'] == {{ id }})
-  {
-    $(`[row=${msg['row']}][col=${msg['col']}]`)
-    .replaceWith(`<td class=\'cell_css\'>${msg['sign']}</td>`)
-
-    $('#curr_player').empty()
-    $('#curr_player').append(`Current player: ${msg['next_sign']}`)
-
-    $('#curr_round').empty()
-    $('#curr_round').append(`Round: ${msg['round']}`)
-  }
 })
 
 })
@@ -76,13 +70,13 @@ socket.on('pressed_cell', function(msg)
     <td>Game {{ id }}</td>
   </tr>
   <tr>
-    <td id='curr_round'></td>
+    <td id='round'>Round ?</td>
   </tr>
   <tr>
-    <td id='curr_player'></td>
+    <td id='player'></td>
   </tr>
   <tr>
-    <td id='players'></td>
+    <td id='players_list'></td>
   </tr>
 </table>
 
@@ -90,7 +84,7 @@ socket.on('pressed_cell', function(msg)
   {% for row in range( rows ) %}
     <tr>
       {% for col in range( cols ) %}
-        <td class='cell_css' row={{row}} col={{col}}></td>
+        <td class='cell' row={{row}} col={{col}}></td>
       {% endfor %}
     </tr>
   {%endfor %}

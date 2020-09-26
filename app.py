@@ -102,6 +102,7 @@ def player_connected(msg, methods=['GET', 'POST']):
 
 @socketio.on('pressed_cell')
 def pressed_cell(msg, methods=['GET', 'POST']):
+    print('recived pressed_cell')
     id = int(msg['game_id'])
     row = int(msg['row'])
     col = int(msg['col'])
@@ -109,6 +110,8 @@ def pressed_cell(msg, methods=['GET', 'POST']):
     if 'in_progress' not in game.get_state():
         return
     if msg['player_id'] != list(game.get_players_register().keys())[game.current_player_id()]:
+        return
+    if (row, col) in game.get_board():
         return
     sign = game.current_player_sign()
     game.set_board(row, col, game.current_player_sign())
@@ -121,17 +124,9 @@ def pressed_cell(msg, methods=['GET', 'POST']):
         db.session.commit()
     except:
         print('Error while saving gamestate')
-    socketio.emit('pressed_cell', {
-        'game_id': id,
-        'row': row,
-        'col': col,
-        'sign': sign,
-        'next_sign': game.current_player_sign(),
-        'round': game.round
-    })
-    print('test')
-    socketio.emit('test', game.to_json())
-    socketio.emit('test', {'text':'aaaaaaaaaaaaaa'}, room=request.sid)
+    print('emitting update_game')
+    socketio.emit('update_game', game.to_json())
+
 
 # </editor-fold>
 
