@@ -4,6 +4,10 @@
   border-collapse: collapse;
 }
 
+.row {
+  margin: 5vh 0 0 5% !important;
+}
+
 .cell {
   border: 1px solid #000;
   width: 30px;
@@ -13,4 +17,18 @@
 
 .cell:hover{
   background-color: royalblue;
+}
+
+.error {
+  color: red;
+}
+
+#your_emoji {
+  margin-left: 2%;
+  margin-bottom: 0.8%;
+}
+
+#note {
+  font-size: 10px;
+  margin-left: 2%;
 }

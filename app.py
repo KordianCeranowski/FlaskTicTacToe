@@ -1,6 +1,6 @@
 # <editor-fold SETUP>
 
-from flask import Flask, render_template, url_for, request, redirect, make_response
+from flask import Flask, render_template, url_for, request, redirect, make_response, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO
 from datetime import datetime
@@ -9,9 +9,8 @@ from collections import defaultdict
 import json
 import re
 
-# json.dumps(obj.__dict__)
-
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'vnkdjnfjknfl1232#'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 db = SQLAlchemy(app)
 socketio = SocketIO(app)
@@ -39,14 +38,19 @@ def create_game(msg, methods=['GET', 'POST']):
         players_count = int(msg['players_count'])
     except (ValueError, TypeError):
         errors += ['One of values was not an integer']
+        flash('One of values was not an integer', 'error')
     if rows not in range(3,100) or cols not in range(3,100):
         errors += ['Rows or columns size out of 3-100 bounds']
+        flash('Rows or columns size out of 3-100 bounds', 'error')
     if goal > rows and goal > cols:
         errors += ['Goal too high']
+        flash('Goal too high', 'error')
     if goal < 3:
         errors += ['Goal too low']
+        flash('Goal too low', 'error')
     if players_count < 1:
         errors += ['Not enough players_count']
+        flash('Not enough players_count', 'error')
     if not errors:
         new_game = Game(rows, cols, goal, players_count)
         try:
@@ -55,14 +59,12 @@ def create_game(msg, methods=['GET', 'POST']):
             id = Game.query.order_by(Game.date_created.desc()).first().id
         except:
             errors += ['Error while saving to database']
+    else:
+        return redirect('/')
     print(f'creating game, errors: {errors}')
     if not errors:
         print(f'sending update_menu with {Game.all_to_json()}')
         socketio.emit('update_menu', Game.all_to_json())
-    else:
-        socketio.emit('game_create_failure', {
-            'errors': errors
-        })
 
 @socketio.on('deleted_game')
 def delete_game(msg, methods=['GET', 'POST']):
@@ -86,7 +88,18 @@ def delete_game(msg, methods=['GET', 'POST']):
 @app.route('/game/<int:id>')
 def run_game(id):
     game = Game.query.get_or_404(id)
-    return render_template('game.html', id=game.id, rows=game.rows, cols=game.cols)
+    if 'emoji-unicode' not in request.cookies:
+        flash('Please choose your emoji first', 'error')
+        return redirect('/')
+    emoji = request.cookies['emoji-unicode'].replace('%3B', ';')
+    session_id = request.cookies['session_id']
+    print(session_id)
+    print(emoji)
+    print(game.get_players_register())
+    if session_id in game.get_players_register() or emoji not in game.get_players_register().values():
+        return render_template('game.html', id=game.id, rows=game.rows, cols=game.cols)
+    flash('Someone already uses your emoji in this game, please switch it so something other', 'error')
+    return redirect('/')
 
 @socketio.on('player_joined_game')
 def player_connected(msg, methods=['GET', 'POST']):
@@ -95,6 +108,8 @@ def player_connected(msg, methods=['GET', 'POST']):
     if len(game.get_players_register()) < game.players_count and msg['player_id'] not in game.get_players_register():
         print('\tadded player to register')
         game.set_players_register(msg['player_id'], msg['emoji'])
+        print('\temitting update_menu')
+        socketio.emit('update_menu', Game.all_to_json())
     print(f'\tregister contains: {game.get_players_register()}')
     print('\temitting update_game')
     socketio.emit('update_game', game.to_json())
@@ -108,10 +123,13 @@ def pressed_cell(msg, methods=['GET', 'POST']):
     col = int(msg['col'])
     game = Game.query.get_or_404(id)
     if 'in_progress' not in game.get_state():
+        print(f'gamestate is {game.get_state()}')
         return
     if msg['player_id'] != list(game.get_players_register().keys())[game.current_player_id()]:
+        print(f'Its another players turn')
         return
     if (row, col) in game.get_board():
+        print('Field already pressed')
         return
     sign = game.current_player_sign()
     game.set_board(row, col, game.current_player_sign())
@@ -230,7 +248,8 @@ class Game(db.Model):
     def get_state(self):
         if len(self.get_players_register()) < self.players_count:
             return "waiting_for_players"
-        if self.winner != '_':
+        print(f'winner: {self.winner} {self.winner==" "}')
+        if self.winner == ' ':
             return f"in_progress"
         return f"ended"
 

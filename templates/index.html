@@ -7,6 +7,15 @@
 <script type="text/javascript">
 $(document).ready(() => {
 
+function emojiUnicode (emoji) {
+  var comp;
+  if (emoji.length === 1) {comp = emoji.charCodeAt(0);}
+  comp = ((emoji.charCodeAt(0) - 0xD800) * 0x400
+        + (emoji.charCodeAt(1) - 0xDC00) + 0x10000);
+  if (comp < 0) {comp = emoji.charCodeAt(0);}
+  return `&#x${comp.toString("16")};`
+};
+
 var socket = io.connect(`http://${document.domain}:${location.port}`);
 
 socket.on('connect', function(msg)
@@ -22,10 +31,10 @@ function update_menu(games)
   {
     $('.table').append(
       `<tr class='menu_game_row'>
-        <td>${game['rows']} XX ${game['cols']}</td>
-        <td>${game['goal']}</td>
-        <td>${game['players_joined']}/${game['players_count']}</td>
-        <td>${game['round']}</td>
+        <td>${game.rows} X ${game.cols}</td>
+        <td>${game.goal}</td>
+        <td>${game.players_joined}/${game.players_count} : ${game.emojis}</td>
+        <td>${game.state.replaceAll("_", " ").replace(/\w\S*/g, (w) => (w.replace(/^\w/, (c) => c.toUpperCase())))}</td>
         <td>
           <a href="/game/${game['id']}" class="btn btn-success">Join</a>
           <a game-id=${game['id']} class="btn btn-danger button-remove">Remove</a>
@@ -47,7 +56,7 @@ socket.on('update_menu', function(msg)
 {
   console.log(`recived update_menu`)
   var games = JSON.parse(msg)['games'];
-  console.log(`recived update_menu with ${games}`)
+  console.log(games);
   update_menu(games)
 })
 
@@ -65,31 +74,38 @@ $('#button-create').click(function()
 
 $('#button-set-emoji').click(function()
 {
+  console.log('setting new emoji')
   Cookies.set('emoji', $("#emoji").val())
-  $('#your_emoji').empty()
-  $('#your_emoji').append($("#emoji").val())
+  Cookies.set('emoji-unicode', emojiUnicode($("#emoji").val()))
+  $('#your_emoji').html(`Your current emoji: ${Cookies.get('emoji-unicode')}`)
   $("#emoji").val("")
 })
 
 if(Cookies.get('session_id') == undefined)
   Cookies.set('session_id', `${parseInt(Math.random()*100000000)}`)
-$('#your_emoji').append(Cookies.get('emoji'))
+$('#your_emoji').html(`Your current emoji: ${Cookies.get('emoji-unicode')}`)
 
 })
 </script>
-
 <div class="container">
   <div class="jumbotron">
     <div class="page-header">
-      <h1>PicPacPoe 🐍 &#x1F923;</h1>
+      <h1>PicPacPoe🐍</h1>
     </div>
     <table class="table table-striped">
       <tr>
         <th scope="col">Size</th>
         <th scope="col">Goal</th>
         <th scope="col">Players</th>
-        <th scope="col">Round</th>
+        <th scope="col">State</th>
         <th scope="col">Options</th>
+      </tr>
+      <tr class="menu_game_row">
+        <th><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div></th>
+        <th><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div></th>
+        <th><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div></th>
+        <th><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div></th>
+        <th><div class="spinner-border" role="status"><span class="sr-only">Loading...</span></div></th>
       </tr>
     </table>
 
@@ -111,8 +127,18 @@ $('#your_emoji').append(Cookies.get('emoji'))
       </div>
     </div>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flashes list-group list-group-flush">
+        {% for category, message in messages %}
+          <li class="{{ category }} list-group-item">{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
 
-    Your current emoji: <div id='your_emoji'></div>
+
+    <div id='your_emoji'></div>
     <div class="form-row align-items-center">
       <div class="col-auto">
         <input type="text" class="form-control mb-2" id="emoji" placeholder="Set your custom emoji">
@@ -121,8 +147,6 @@ $('#your_emoji').append(Cookies.get('emoji'))
         <input type='submit' id="button-set-emoji" class="btn btn-primary mb-2"></input>
       </div>
     </div>
-
-
   </div>
 </div>
 {% endblock %}

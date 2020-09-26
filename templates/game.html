@@ -14,6 +14,11 @@ function emojiUnicode (emoji) {
   return `&#x${comp.toString("16")};`
 };
 
+function playSound(url) {
+    var a = new Audio(url);
+    a.play();
+}
+
 socket.on('connect', function(msg)
 {
   console.log('joined, emitting player_joined_game')
@@ -32,10 +37,33 @@ function update_game(game)
     var parsed_key = key.substring(1, key.length-1).split(',')
     var row = parsed_key[0]
     var col = parsed_key[1]
-    $(`[row=${row}][col=${col}]`).empty()
-    $(`[row=${row}][col=${col}]`).append(board[key])
+    $(`[row=${row}][col=${col}]`).html(board[key])
   }
   $('#round').text(`Round ${game.round}`)
+  $('#player').html(`Current player: ${game.emojis[game.round % game.players_count]}`)
+  $('#players_list').html(`Players (${game.players_joined}/${game.players_count}): ${game.emojis}`)
+  var winner
+  var desc
+  switch (game.winner) {
+    case '':
+      break;
+    case 'DRAW':
+      announce_winner('Stalemate', '')
+      playSound('https://wiki.teamfortress.com/w/images/b/b8/Announcer_stalemate.wav')
+      break;
+    case Cookies.get('emoji-unicode'):
+      announce_winner(game.winner, 'congrats')
+      playSound('https://wiki.teamfortress.com/w/images/b/b8/Announcer_am_lastmanalive02.wav')
+      break;
+    default:
+      announce_winner(game.winner, 'you lose, not big suprise')
+      playSound('https://wiki.teamfortress.com/w/images/1/15/Announcer_am_lastmanforfeit03.wav')
+  }
+}
+
+function announce_winner(name, desc){
+  $('#winner').html(`<h2><b>WINNER: ${name}</b></h2>`)
+  $('#winner').append(`<h5>${desc}</h5>`)
 }
 
 socket.on('update_game', function(msg)
@@ -65,18 +93,22 @@ $('.cell').click(function()
 })
 </script>
 
+<div class="row">
 <table id=ui class=table-striped>
   <tr>
     <td>Game {{ id }}</td>
   </tr>
   <tr>
-    <td id='round'>Round ?</td>
+    <td id='round'>Round <div class='spinner-border spinner-border-sm' role='status'><span class='sr-only'>Loading...</span></div></td>
   </tr>
   <tr>
-    <td id='player'></td>
+    <td id='player'>Current Player: <div class='spinner-border spinner-border-sm' role='status'><span class='sr-only'>Loading...</span></div></td>
   </tr>
   <tr>
-    <td id='players_list'></td>
+    <td id='players_list'>Players (/):<div class='spinner-border spinner-border-sm' role='status'><span class='sr-only'>Loading...</span></div></td>
+  </tr>
+  <tr>
+    <td id='winner'></td>
   </tr>
 </table>
 
@@ -89,5 +121,7 @@ $('.cell').click(function()
     </tr>
   {%endfor %}
 </table>
+</div>
+
 
 {% endblock %}
