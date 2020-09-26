@@ -11,6 +11,6 @@
   text-align: center;
 }
 
-.cell:hover{
+.cell_css:hover{
   background-color: royalblue;
 }

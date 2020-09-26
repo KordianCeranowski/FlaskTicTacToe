@@ -85,19 +85,19 @@ def delete_game(msg, methods=['GET', 'POST']):
 # <editor-fold GAME
 @app.route('/game/<int:id>')
 def run_game(id):
-    return render_template('game.html')
+    game = Game.query.get_or_404(id)
+    return render_template('game.html', id=game.id, rows=game.rows, cols=game.cols)
 
 @socketio.on('player_joined_game')
 def player_connected(msg, methods=['GET', 'POST']):
+    print(f"recived player_joined_game from {msg['player_id']} {msg['emoji']}")
     game = Game.query.get_or_404(msg['game_id'])
-    if  len(game.get_players_register()) < game.players_count and \
-        msg['player_id'] not in game.get_players_register():
+    if len(game.get_players_register()) < game.players_count and msg['player_id'] not in game.get_players_register():
+        print('\tadded player to register')
         game.set_players_register(msg['player_id'], msg['emoji'])
-    print(game.get_players_register())
-    socketio.emit('player_connected', {
-        'game_id': msg['game_id'],
-        'joined_players_emojis': ' '.join(game.get_players_register().values())
-    })
+    print(f'\tregister contains: {game.get_players_register()}')
+    print('\temitting update_game')
+    socketio.emit('update_game', game.to_json())
 
 
 @socketio.on('pressed_cell')

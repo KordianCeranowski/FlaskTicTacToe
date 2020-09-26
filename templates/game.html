@@ -16,18 +16,27 @@ function emojiUnicode (emoji) {
 
 socket.on('connect', function(msg)
 {
-  socket.emit('player_connected',
+  console.log('joined, emitting player_joined_game')
+  socket.emit('player_joined_game',
   {
     'player_id': Cookies.get('session_id'),
     'emoji': emojiUnicode(Cookies.get('emoji')),
-    'game_id': {{ game.id }}
+    'game_id': {{ id }}
   })
 })
 
-socket.on('player_joined_game', function(msg)
+function update_game(game)
 {
-  $('#players').empty()
-  $('#players').append(`Joined Players: ${msg['joined_players_emojis']}`)
+  console.log('brrrrrrrrrrrr');
+  console.log(game)
+}
+
+socket.on('update_game', function(msg)
+{
+  console.log(`recived update_game`)
+  var game = JSON.parse(msg)['game'];
+  console.log(`recived update_game with ${game}`)
+  update_game(game)
 })
 
 $('.cell').click(function()
@@ -37,7 +46,7 @@ $('.cell').click(function()
   console.log(`row: ${row}, col: ${col}`)
   socket.emit('pressed_cell',
   {
-    'game_id': {{ game.id }},
+    'game_id': {{ id }},
     'row': `${row}`,
     'col': `${col}`,
     'player_id': Cookies.get('session_id')
@@ -46,7 +55,7 @@ $('.cell').click(function()
 
 socket.on('pressed_cell', function(msg)
 {
-  if(msg['game_id'] == {{ game.id }})
+  if(msg['game_id'] == {{ id }})
   {
     $(`[row=${msg['row']}][col=${msg['col']}]`)
     .replaceWith(`<td class=\'cell_css\'>${msg['sign']}</td>`)
@@ -64,30 +73,26 @@ socket.on('pressed_cell', function(msg)
 
 <table id=ui class=table-striped>
   <tr>
-    <td>Game {{ game.id }}</td>
+    <td>Game {{ id }}</td>
   </tr>
   <tr>
-    <td id='curr_round'>Round {{game.round}}</td>
+    <td id='curr_round'></td>
   </tr>
   <tr>
-    <td id='curr_player'>Current Player: {{ game.current_player_sign() }}</td>
+    <td id='curr_player'></td>
   </tr>
   <tr>
-    <td id='players'>Joined Players:</td>
+    <td id='players'></td>
   </tr>
 </table>
 
 <table id=board>
-  {% for row in range(game.rows) %}
-  <tr>
-    {% for col in range(game.cols) %}
-    {% if game.get_board()[(row,col)] != '_' %}
-      <td class='cell_css'>{{ game.get_board()[(row,col)] }}</td>
-    {% else %}
-      <td class='cell cell_css' row={{row}} col={{col}}></td>
-    {% endif %}
-    {% endfor %}
-  </tr>
+  {% for row in range( rows ) %}
+    <tr>
+      {% for col in range( cols ) %}
+        <td class='cell_css' row={{row}} col={{col}}></td>
+      {% endfor %}
+    </tr>
   {%endfor %}
 </table>
 
