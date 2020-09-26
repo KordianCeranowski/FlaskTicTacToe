@@ -24,10 +24,6 @@
     return `&#x${comp.toString("16")};`
   };
 
-    socket.on('echo', function(msg){
-      console.log(msg['text'])
-    })
-
     socket.on('connect', function(msg){
       socket.emit('player_connected', {
         'player_id': Cookies.get('session_id'),
@@ -48,7 +44,8 @@
       socket.emit('pressed_cell', {
         'game_id': {{ game.id }},
         'row': `${row}`,
-        'col': `${col}`
+        'col': `${col}`,
+        'player_id': Cookies.get('session_id')
       })
     })
 
@@ -63,6 +60,11 @@
         $('#curr_round').empty()
         $('#curr_round').append(`Round: ${msg['round']}`)
       }
+    })
+
+    socket.on('test', function(msg) {
+      console.log('test')
+      console.log(msg)
     })
   })
 </script>

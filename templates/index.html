@@ -5,60 +5,117 @@
 {% block body %}
 
 <script type="text/javascript">
-  $(document).ready(() => {
-    var socket = io.connect(`http://${document.domain}:${location.port}`);
+$(document).ready(() => {
 
-    $('#button-create').click(function() {
-      console.log(Cookies.get('kuki'));
-      socket.emit('created_game', {
-        'rows':     $("#rows").val(),
-        'cols':     $("#cols").val(),
-        'goal':     $("#goal").val(),
-        'players_count':  $("#players_count").val()
-      })
+var socket = io.connect(`http://${document.domain}:${location.port}`);
+
+socket.on('console.log', function(msg)
+{
+  console.log(msg)
+  console.log(msg['text'])
+})
+
+socket.on('connect', function(msg)
+{
+  socket.emit('player_joined_menu', {})
+  console.log('sent')
+})
+
+$('#button-create').click(function()
+{
+  socket.emit('created_game',
+  {
+    'rows':     $("#rows").val(),
+    'cols':     $("#cols").val(),
+    'goal':     $("#goal").val(),
+    'players_count':  $("#players_count").val()
+  })
+})
+
+function update_menu(games)
+{
+  $(".menu_game_row").remove();
+  games.forEach((game) =>
+  {
+    $('.table').append(
+      `<tr class='menu_game_row'>
+        <td>${game['rows']} XX ${game['cols']}</td>
+        <td>${game['goal']}</td>
+        <td>${game['players_joined']}/${game['players_count']}</td>
+        <td>${game['round']}</td>
+        <td>
+          <a href="/game/${game['id']}" class="btn btn-success">Join</a>
+          <a game-id=${game['id']} class="btn btn-danger button-remove">Remove</a>
+        </td>
+      </tr>`)
+  })
+  $('.button-remove').click(function()
+  {
+    socket.emit('deleted_game', {
+      'id':  $(this).attr('game-id')
     })
+  });
+}
 
-    socket.on('game_create_success', function(msg) {
-      $('.table').append(
-        `<tr id='table_row_${msg['id']}'>
-          <td>${msg['rows']} x ${msg['cols']}</td>
-          <td>${msg['goal']}</td>
-          <td>${msg['players_count']}</td>
-          <td>0</td>
-          <td>
-            <a href="/game/${msg['id']}" class="btn btn-success">
-              Join
-            </a>
-            <a game-id=${msg['id']} class="btn btn-danger button-remove">
-              Remove
-            </a>
-          </td>
-        </tr>`)
-        $('.button-remove').click(function() {
-          socket.emit('deleted_game', {
-            'id':  $(this).attr('game-id')
-          })
-        })
-    })
+socket.on('update_menu', function(msg)
+{
+  console.log(msg['games'])
+  var games = JSON.parse(msg)['games'];
+  console.log(games)
+  update_menu(games)
+})
 
+socket.on('game_create_success', function(msg)
+{
+  $('.table').append(
+    `<tr id='table_row_${msg['id']}'>
+      <td>${msg['rows']} x ${msg['cols']}</td>
+      <td>${msg['goal']}</td>
+      <td>${msg['players_count']}</td>
+      <td>0</td>
+      <td>
+        <a href="/game/${msg['id']}" class="btn btn-success">
+          Join
+        </a>
+        <a game-id=${msg['id']} class="btn btn-danger button-remove">
+          Remove
+        </a>
+      </td>
+    </tr>`)
     $('.button-remove').click(function() {
       socket.emit('deleted_game', {
         'id':  $(this).attr('game-id')
       })
     })
+})
 
-    socket.on('game_delete_success', function(msg) {
-      $(`#table_row_${msg['id']}`).remove()
-    })
-
-    if(Cookies.get('session_id') == undefined)
-      Cookies.set('session_id', `${parseInt(Math.random()*100000000)}`)
-
-    $('#button-set-emoji').click(function() {
-      Cookies.set('emoji', $("#emoji").val())
-    })
-
+$('.button-remove').click(function()
+{
+  socket.emit('deleted_game',
+  {
+    'id':  $(this).attr('game-id')
   })
+})
+
+socket.on('game_delete_success', function(msg)
+{
+  $(`#table_row_${msg['id']}`).remove()
+})
+
+if(Cookies.get('session_id') == undefined)
+  Cookies.set('session_id', `${parseInt(Math.random()*100000000)}`)
+
+$('#button-set-emoji').click(function()
+{
+  Cookies.set('emoji', $("#emoji").val())
+  $('#your_emoji').empty()
+  $('#your_emoji').append($("#emoji").val())
+  $("#emoji").val("")
+})
+
+$('#your_emoji').append(Cookies.get('emoji'))
+
+})
 </script>
 
 <div class="container">
@@ -74,22 +131,6 @@
         <th scope="col">Round</th>
         <th scope="col">Options</th>
       </tr>
-      {% for game in games %}
-      <tr id='table_row_{{ game.id }}'>
-        <td>{{ game.rows }} x {{ game.cols }}</td>
-        <td>{{ game.goal }}</td>
-        <td>{{ game.players_count }}</td>
-        <td>{{ game.get_state() }}</td>
-        <td>
-          <a href="/game/{{ game.id }}" class="btn btn-success">
-            Join
-          </a>
-          <a game-id={{ game.id }} class="btn btn-danger button-remove">
-            Remove
-          </a>
-        </td>
-      </tr>
-      {% endfor %}
     </table>
 
     <div class="form-row align-items-center">
@@ -110,6 +151,8 @@
       </div>
     </div>
 
+
+    Your current emoji: <div id='your_emoji'></div>
     <div class="form-row align-items-center">
       <div class="col-auto">
         <input type="text" class="form-control mb-2" id="emoji" placeholder="Set your custom emoji">
@@ -118,6 +161,7 @@
         <input type='submit' id="button-set-emoji" class="btn btn-primary mb-2"></input>
       </div>
     </div>
+
 
   </div>
 </div>

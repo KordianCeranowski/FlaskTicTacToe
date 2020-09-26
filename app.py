@@ -4,6 +4,8 @@ from flask_socketio import SocketIO
 from datetime import datetime
 import pickle
 from collections import defaultdict
+import json
+import re
 
 # json.dumps(obj.__dict__)
 
@@ -24,14 +26,21 @@ def player_connected(msg, methods=['GET', 'POST']):
         'joined_players_emojis': ' '.join(game.get_players_register().values())
     })
 
+@socketio.on('player_joined_menu')
+def player_joined_menu(msg, methods=['GET, POST']):
+    socketio.emit('update_menu', Game.all_to_json(), room=request.sid)
+
 @socketio.on('pressed_cell')
 def pressed_cell(msg, methods=['GET', 'POST']):
     id = int(msg['game_id'])
     row = int(msg['row'])
     col = int(msg['col'])
     game = Game.query.get_or_404(id)
+    if 'in_progress' not in game.get_state():
+        return
+    if msg['player_id'] != list(game.get_players_register().keys())[game.current_player_id()]:
+        return
     sign = game.current_player_sign()
-
     game.set_board(row, col, game.current_player_sign())
     if game.has_won(row, col, game.goal, sign):
         game.winner = sign
@@ -50,6 +59,9 @@ def pressed_cell(msg, methods=['GET', 'POST']):
         'next_sign': game.current_player_sign(),
         'round': game.round
     })
+    print('test')
+    socketio.emit('test', game.to_json())
+    socketio.emit('test', {'text':'aaaaaaaaaaaaaa'}, room=request.sid)
 
 @socketio.on('created_game')
 def create_game(msg, methods=['GET', 'POST']):
@@ -60,16 +72,15 @@ def create_game(msg, methods=['GET', 'POST']):
         goal = int(msg['goal'])
         players_count = int(msg['players_count'])
     except (ValueError, TypeError):
-        errors = ['One of values was not an integer']
+        errors += ['One of values was not an integer']
     if rows not in range(3,100) or cols not in range(3,100):
         errors += ['Rows or columns size out of 3-100 bounds']
     if goal > rows and goal > cols:
         errors += ['Goal too high']
     if goal < 3:
         errors += ['Goal too low']
-    if players_count < 2:
+    if players_count < 1:
         errors += ['Not enough players_count']
-
     if not errors:
         new_game = Game(rows, cols, goal, players_count)
         try:
@@ -78,16 +89,9 @@ def create_game(msg, methods=['GET', 'POST']):
             id = Game.query.order_by(Game.date_created.desc()).first().id
         except:
             errors += ['Error while saving to database']
-
     print(errors)
     if not errors:
-        socketio.emit('game_create_success', {
-            'id': id,
-            'rows': rows,
-            'cols': cols,
-            'goal': goal,
-            'players_count': players_count
-        })
+        socketio.emit('update_menu', Game.all_to_json())
     else:
         socketio.emit('game_create_failure', {
             'errors': errors
@@ -104,26 +108,18 @@ def delete_game(msg, methods=['GET', 'POST']):
         errors += ['Error while saving to database']
 
     if not errors:
-        socketio.emit('game_delete_success', {
-            'id': msg['id']
-        })
+        socketio.emit('update_menu', Game.all_to_json())
     else:
-        socketio.emit('game_delete_failure', {
-            'errors': errors
-        })
+        socketio.emit('game_delete_failure', {'errors': errors})
 
 @app.route('/')
 def index():
     games = Game.query.order_by(Game.date_created).all()
-    # śmieszny easter egg
-    resp = make_response(render_template('index.html', games=games))
-    resp.set_cookie('ciastko', 'jebac pis')
-    return resp
+    return render_template('index.html', games=games)
 
 @app.route('/game/<int:id>')
 def run_game(id):
-    game_to_play = Game.query.get_or_404(id)
-    return render_template('game.html', game=game_to_play)
+    return render_template('game.html')
 
 
 class Game(db.Model):
@@ -137,6 +133,26 @@ class Game(db.Model):
     round = db.Column(db.Integer)
     winner = db.Column(db.String(4), default=' ')
     goal =  db.Column(db.Integer)
+
+    def to_json(self):
+        json =  str('{\n' + f'\
+                "id": {self.id}, \
+                "rows": {self.rows}, \
+                "cols": {self.cols},   \
+                "goal": {self.goal}, \
+                "players_count": {self.players_count}, \
+                "players_joined": {len(self.get_players_register())}, \
+                "state": "{self.get_state()}", \
+                "round": {self.round}, \
+                "winner": "{str(self.winner)}", \
+                "board": {str({str(key): str(self.get_board()[key]) for key in self.get_board()})} \
+                '+ '}')
+        return re.sub(r"'", "\"", re.sub(r"[\s\t]*", "", json))
+
+    def all_to_json():
+        games = [game.to_json() for game in Game.query.all()]
+        games = '{"games": [' + ','.join(games) + "]}"
+        return games
 
     def default_value():
         return '_'
@@ -203,10 +219,10 @@ class Game(db.Model):
 
     def get_state(self):
         if len(self.get_players_register()) < self.players_count:
-            return f"Waiting for players: {len(self.get_players_register())}/{self.players_count}"
+            return "waiting_for_players"
         if self.winner != '_':
-            return f"In progress. Round: {self.round}"
-        return f"Game ended. Winner: {self.winner}"
+            return f"in_progress"
+        return f"ended"
 
 if __name__ == '__main__':
     app.run(debug=True)
