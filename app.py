@@ -14,6 +14,7 @@ app.config['SECRET_KEY'] = 'vnkdjnfjknfl1232#'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 db = SQLAlchemy(app)
 socketio = SocketIO(app)
+socketio.init_app(app, cors_allowed_origins="*")
 
 # </editor-fold>
 
@@ -254,4 +255,4 @@ class Game(db.Model):
         return f"ended"
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(ssl_context='adhoc')

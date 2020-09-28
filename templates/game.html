@@ -3,7 +3,9 @@
 {% endblock %}
 {% block body %}
 <script type="text/javascript">
-var socket = io.connect(`http://${document.domain}:${location.port}`);
+
+var socket = io.connect(`https://${document.domain}:${location.port}`);
+
 $(document).ready(() => {
 function emojiUnicode (emoji) {
   var comp;
